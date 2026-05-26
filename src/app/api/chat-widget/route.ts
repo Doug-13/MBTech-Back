@@ -25,7 +25,7 @@ function getCorsOrigin(req: NextRequest) {
 function corsHeaders(req: NextRequest) {
   return {
     "Access-Control-Allow-Origin": getCorsOrigin(req),
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
   };
@@ -53,11 +53,49 @@ async function readRequestBody(req: NextRequest) {
   }
 }
 
+function normalizeN8nResponse(responseJson: any, responseText: string) {
+  const reply =
+    responseJson?.reply ||
+    responseJson?.response ||
+    responseJson?.message ||
+    responseJson?.text ||
+    responseJson?.output ||
+    responseJson?.resposta ||
+    responseJson?.resposta_ai ||
+    responseJson?.responseText ||
+    responseJson?.rawResponse ||
+    responseText ||
+    "Recebi sua mensagem, mas o n8n não retornou uma resposta reconhecida.";
+
+  return {
+    success: true,
+    reply,
+    response: reply,
+    message: reply,
+    channel: responseJson?.channel || "web-widget-test",
+    n8n: responseJson,
+  };
+}
+
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, {
     status: 204,
     headers: corsHeaders(req),
   });
+}
+
+export async function GET(req: NextRequest) {
+  return NextResponse.json(
+    {
+      success: true,
+      route: "/api/chat-widget",
+      message: "Rota chat-widget ativa. Use POST para enviar mensagens.",
+    },
+    {
+      status: 200,
+      headers: corsHeaders(req),
+    }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -67,7 +105,9 @@ export async function POST(req: NextRequest) {
     const n8nWebhookUrl = process.env.N8N_TEST_CHAT_WEBHOOK_URL;
 
     if (!n8nWebhookUrl) {
-      console.error("[CHAT_WIDGET_PROXY] N8N_TEST_CHAT_WEBHOOK_URL não configurada.");
+      console.error(
+        "[CHAT_WIDGET_PROXY] N8N_TEST_CHAT_WEBHOOK_URL não configurada."
+      );
 
       return NextResponse.json(
         {
@@ -117,6 +157,7 @@ export async function POST(req: NextRequest) {
       ok: n8nResponse.ok,
       status: n8nResponse.status,
       elapsedMs: Date.now() - startedAt,
+      responseText,
       responseJson,
     });
 
@@ -127,6 +168,7 @@ export async function POST(req: NextRequest) {
           error: "Erro ao chamar o workflow n8n.",
           status: n8nResponse.status,
           details: responseJson,
+          rawResponse: responseText,
         },
         {
           status: n8nResponse.status,
@@ -135,31 +177,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const reply =
-      responseJson?.reply ||
-      responseJson?.response ||
-      responseJson?.message ||
-      responseJson?.text ||
-      responseJson?.output ||
-      responseJson?.resposta ||
-      responseJson?.responseText ||
-      responseJson?.rawResponse ||
-      "Recebi sua mensagem, mas o n8n não retornou uma resposta reconhecida.";
+    const normalized = normalizeN8nResponse(responseJson, responseText);
 
-    return NextResponse.json(
-      {
-        success: true,
-        reply,
-        response: reply,
-        message: reply,
-        channel: responseJson?.channel || "web-widget-test",
-        n8n: responseJson,
-      },
-      {
-        status: 200,
-        headers: corsHeaders(req),
-      }
-    );
+    return NextResponse.json(normalized, {
+      status: 200,
+      headers: corsHeaders(req),
+    });
   } catch (error: any) {
     console.error("[CHAT_WIDGET_PROXY] Erro inesperado:", {
       message: error?.message,
