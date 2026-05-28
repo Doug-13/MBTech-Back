@@ -89,13 +89,13 @@ export async function GET(req: NextRequest, context: RouteParams) {
           error: "ID da conversa não informado.",
           messages: [],
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
     const limit = Math.min(
       Number(req.nextUrl.searchParams.get("limit") || 300),
-      500,
+      500
     );
 
     console.log("[BACK][CONVERSATION_MESSAGES] request =>", {
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest, context: RouteParams) {
          and id = $2
        limit 1
       `,
-      [session.companyId, conversationId],
+      [session.companyId, conversationId]
     );
 
     if (conversationResult.rows.length === 0) {
@@ -127,7 +127,7 @@ export async function GET(req: NextRequest, context: RouteParams) {
           conversation: null,
           messages: [],
         },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
@@ -161,7 +161,7 @@ export async function GET(req: NextRequest, context: RouteParams) {
       order by created_at asc
       limit $3
       `,
-      [session.companyId, conversationId, limit],
+      [session.companyId, conversationId, limit]
     );
 
     const messages = messagesResult.rows
